@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mon marché</title>
+<style>
+  :root {
+    --vert: #1f5a3a;
+    --vert-clair: #e4eedf;
+    --fond: #f4f7f1;
+    --texte: #1d2a22;
+    --gris: #5d6b62;
+    --bordure: #cfd9cb;
+    --indigo: #243a6b;
+    --alerte: #a3261f;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Trebuchet MS", system-ui, sans-serif; background: var(--fond); color: var(--texte); line-height: 1.45; }
+  header { background: var(--vert); color: #fff; padding: 18px 16px 14px; }
+  header h1 { margin: 0; font-size: 1.6rem; letter-spacing: .3px; }
+  header p { margin: 4px 0 0; font-size: .95rem; opacity: .9; }
+  main { max-width: 760px; margin: 0 auto; padding: 14px 14px 110px; }
+  input, select, button { font: inherit; }
+  .recherche { width: 100%; padding: 12px; border: 1px solid var(--bordure); border-radius: 8px; background: #fff; }
+  .categories { display: flex; gap: 8px; overflow-x: auto; padding: 12px 0; }
+  .categories button { flex: none; border: 1px solid var(--bordure); background: #fff; padding: 8px 14px; border-radius: 20px; cursor: pointer; }
+  .categories button[aria-pressed="true"] { background: var(--vert); color: #fff; border-color: var(--vert); }
+  .produit { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--bordure); }
+  .produit h3 { margin: 0; font-size: 1rem; }
+  .produit .prix { color: var(--gris); font-size: .9rem; }
+  .quantite { display: flex; align-items: center; gap: 8px; }
+  .quantite button, .ajouter { border: 0; border-radius: 8px; cursor: pointer; }
+  .quantite button { width: 36px; height: 36px; background: var(--vert-clair); color: var(--vert); font-size: 1.2rem; }
+  .ajouter { background: var(--vert); color: #fff; padding: 9px 16px; }
+  :focus-visible { outline: 3px solid var(--indigo); outline-offset: 2px; }
+  .barre-panier { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid var(--bordure); }
+  .barre-panier button { width: 100%; max-width: 760px; display: block; margin: 0 auto; padding: 14px; border: 0; border-radius: 10px; background: var(--indigo); color: #fff; font-weight: bold; cursor: pointer; }
+  .barre-panier button:disabled { background: #9aa4b8; cursor: default; }
+  dialog { width: min(560px, 94vw); border: 0; border-radius: 12px; padding: 18px; max-height: 92vh; }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  dialog h2 { margin: 0 0 10px; }
+  .ligne { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; }
+  .total { font-weight: bold; border-top: 1px solid var(--bordure); margin-top: 6px; padding-top: 10px; }
+  label { display: block; margin-top: 12px; font-size: .92rem; }
+  label input[type="text"], label input[type="tel"] { width: 100%; padding: 11px; border: 1px solid var(--bordure); border-radius: 8px; margin-top: 4px; }
+  fieldset { border: 1px solid var(--bordure); border-radius: 8px; margin: 14px 0 0; padding: 4px 12px 10px; }
+  fieldset label { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .erreur { color: var(--alerte); margin: 10px 0 0; min-height: 1.2em; }
+  .actions { display: flex; gap: 10px; margin-top: 14px; }
+  .actions button { flex: 1; padding: 13px; border-radius: 10px; border: 1px solid var(--bordure); background: #fff; cursor: pointer; }
+  .actions .principal { background: var(--vert); color: #fff; border-color: var(--vert); font-weight: bold; }
+  .vide { color: var(--gris); padding: 24px 0; text-align: center; }
+  @media (prefers-reduced-motion: no-preference) { .categories { scroll-behavior: smooth; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Mon marché</h1>
+  <p>Choisissez vos produits, validez, on vous livre.</p>
+</header>
+
+<main>
+  <input class="recherche" id="recherche" type="search" placeholder="Chercher un produit (tomate, riz, mangue...)" aria-label="Chercher un produit">
+  <div class="categories" id="categories" role="group" aria-label="Catégories"></div>
+  <div id="liste"></div>
+</main>
+
+<div class="barre-panier">
+  <button id="ouvrir-panier" disabled>Votre panier est vide</button>
+</div>
+
+<dialog id="panier">
+  <h2>Votre commande</h2>
+  <div id="recap"></div>
+
+  <label>Nom
+    <input type="text" id="nom" autocomplete="name">
+  </label>
+  <label>Téléphone
+    <input type="tel" id="telephone" autocomplete="tel" placeholder="Ex. 70 00 00 00">
+  </label>
+  <label>Adresse de livraison (quartier, repère)
+    <input type="text" id="adresse" autocomplete="street-address">
+  </label>
+
+  <fieldset>
+    <legend>Paiement</legend>
+    <label><input type="radio" name="paiement" value="orange_money" checked> Orange Money</label>
+    <label><input type="radio" name="paiement" value="wave"> Wave</label>
+    <label><input type="radio" name="paiement" value="livraison"> Payer à la livraison</label>
+  </fieldset>
+
+  <p class="erreur" id="erreur" role="alert"></p>
+  <div class="actions">
+    <button type="button" id="fermer">Continuer mes achats</button>
+    <button type="button" class="principal" id="valider">Valider la commande</button>
+  </div>
+</dialog>
+
+<script>
+  var produits = [];
+  var fraisLivraison = 0;
+  var panier = {};            // { idProduit: quantité }
+  var categorieActive = "Tous";
+
+  function fcfa(n) { return n.toLocaleString("fr-FR") + " FCFA"; }
+
+  try { panier = JSON.parse(localStorage.getItem("panier") || "{}"); } catch (e) { panier = {}; }
+  function sauver() { try { localStorage.setItem("panier", JSON.stringify(panier)); } catch (e) {} }
+
+  function sousTotal() {
+    return produits.reduce(function (s, p) { return s + (panier[p.id] || 0) * p.prix; }, 0);
+  }
+  function nbArticles() {
+    return Object.keys(panier).reduce(function (s, k) { return s + panier[k]; }, 0);
+  }
+
+  function changer(id, delta) {
+    var q = (panier[id] || 0) + delta;
+    if (q <= 0) { delete panier[id]; } else { panier[id] = Math.min(q, 50); }
+    sauver();
+    afficherListe();
+    majBarre();
+    if (document.getElementById("panier").open) afficherRecap();
+  }
+
+  function afficherCategories() {
+    var noms = ["Tous"];
+    produits.forEach(function (p) { if (noms.indexOf(p.categorie) === -1) noms.push(p.categorie); });
+    var zone = document.getElementById("categories");
+    zone.innerHTML = "";
+    noms.forEach(function (nom) {
+      var b = document.createElement("button");
+      b.textContent = nom;
+      b.setAttribute("aria-pressed", nom === categorieActive);
+      b.onclick = function () { categorieActive = nom; afficherCategories(); afficherListe(); };
+      zone.appendChild(b);
+    });
+  }
+
+  function afficherListe() {
+    var texte = document.getElementById("recherche").value.trim().toLowerCase();
+    var zone = document.getElementById("liste");
+    zone.innerHTML = "";
+    var resultats = produits.filter(function (p) {
+      return (categorieActive === "Tous" || p.categorie === categorieActive) &&
+             p.nom.toLowerCase().indexOf(texte) !== -1;
+    });
+    if (resultats.length === 0) {
+      zone.innerHTML = '<p class="vide">Aucun produit trouvé. Essayez un autre mot.</p>';
+      return;
+    }
+    resultats.forEach(function (p) {
+      var q = panier[p.id] || 0;
+      var div = document.createElement("div");
+      div.className = "produit";
+      var info = document.createElement("div");
+      info.innerHTML = "<h3></h3><div class='prix'></div>";
+      info.querySelector("h3").textContent = p.nom;
+      info.querySelector(".prix").textContent = fcfa(p.prix) + " / " + p.unite;
+      div.appendChild(info);
+
+      if (q === 0) {
+        var a = document.createElement("button");
+        a.className = "ajouter";
+        a.textContent = "Ajouter";
+        a.onclick = function () { changer(p.id, 1); };
+        div.appendChild(a);
+      } else {
+        var c = document.createElement("div");
+        c.className = "quantite";
+        c.innerHTML = '<button aria-label="Retirer un">−</button><strong>' + q + '</strong><button aria-label="Ajouter un">+</button>';
+        c.children[0].onclick = function () { changer(p.id, -1); };
+        c.children[2].onclick = function () { changer(p.id, 1); };
+        div.appendChild(c);
+      }
+      zone.appendChild(div);
+    });
+  }
+
+  function majBarre() {
+    var b = document.getElementById("ouvrir-panier");
+    var n = nbArticles();
+    b.disabled = n === 0;
+    b.textContent = n === 0 ? "Votre panier est vide" : "Voir le panier (" + n + ") · " + fcfa(sousTotal());
+  }
+
+  function afficherRecap() {
+    var zone = document.getElementById("recap");
+    zone.innerHTML = "";
+    produits.forEach(function (p) {
+      var q = panier[p.id];
+      if (!q) return;
+      var l = document.createElement("div");
+      l.className = "ligne";
+      var g = document.createElement("span");
+      g.textContent = q + " × " + p.nom;
+      var d = document.createElement("span");
+      d.textContent = fcfa(q * p.prix);
+      l.appendChild(g); l.appendChild(d);
+      zone.appendChild(l);
+    });
+    var liv = document.createElement("div");
+    liv.className = "ligne";
+    liv.innerHTML = "<span>Livraison</span><span>" + fcfa(fraisLivraison) + "</span>";
+    zone.appendChild(liv);
+    var t = document.createElement("div");
+    t.className = "ligne total";
+    t.innerHTML = "<span>Total</span><span>" + fcfa(sousTotal() + fraisLivraison) + "</span>";
+    zone.appendChild(t);
+  }
+
+  document.getElementById("recherche").oninput = afficherListe;
+
+  document.getElementById("ouvrir-panier").onclick = function () {
+    afficherRecap();
+    document.getElementById("erreur").textContent = "";
+    document.getElementById("panier").showModal();
+  };
+  document.getElementById("fermer").onclick = function () { document.getElementById("panier").close(); };
+
+  document.getElementById("valider").onclick = function () {
+    var erreur = document.getElementById("erreur");
+    var bouton = document.getElementById("valider");
+    erreur.textContent = "";
+    var paiement = document.querySelector('input[name="paiement"]:checked').value;
+    var lignes = Object.keys(panier).map(function (id) { return { id: Number(id), quantite: panier[id] }; });
+
+    bouton.disabled = true;
+    fetch("/api/commande", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nom: document.getElementById("nom").value.trim(),
+        telephone: document.getElementById("telephone").value.trim(),
+        adresse: document.getElementById("adresse").value.trim(),
+        paiement: paiement,
+        panier: lignes
+      })
+    })
+    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+    .then(function (res) {
+      bouton.disabled = false;
+      if (!res.ok) { erreur.textContent = res.d.erreur || "La commande n'a pas pu être envoyée."; return; }
+      panier = {}; sauver();
+      afficherListe(); majBarre();
+      var texte = paiement === "livraison"
+        ? "Vous paierez " + fcfa(res.d.total) + " à la livraison."
+        : "Nous vous contactons pour le paiement de " + fcfa(res.d.total) + ".";
+      document.getElementById("panier").innerHTML =
+        "<h2>Commande envoyée</h2><p>Numéro : <strong>" + res.d.numero + "</strong></p><p>" + texte +
+        "</p><div class='actions'><button class='principal' onclick='location.reload()'>Retour au marché</button></div>";
+    })
+    .catch(function () {
+      bouton.disabled = false;
+      erreur.textContent = "Pas de connexion au serveur. Vérifiez votre réseau et réessayez.";
+    });
+  };
+
+  fetch("/api/produits")
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      produits = d.produits;
+      fraisLivraison = d.fraisLivraison;
+      // retire du panier les produits qui n'existent plus
+      Object.keys(panier).forEach(function (id) {
+        if (!produits.some(function (p) { return String(p.id) === id; })) delete panier[id];
+      });
+      afficherCategories(); afficherListe(); majBarre();
+    })
+    .catch(function () {
+      document.getElementById("liste").innerHTML = '<p class="vide">Impossible de charger les produits. Lancez le serveur (npm start) puis rechargez la page.</p>';
+    });
+</script>
+</body>
+</html>
